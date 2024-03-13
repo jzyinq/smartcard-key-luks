@@ -14,3 +14,9 @@ when you boot, you are prompted to insert your Librem Key and enter
 your normal GPG PIN to decrypt your disk. It also modifys the
 "recovery" boot option in grub to bypass the GPG key and request your
 passphrase instead.
+
+## Requirements
+
+```bash 
+sudo apt install scdaemon opensc gnupg2 pinentry-curses
+```

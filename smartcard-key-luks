@@ -10,7 +10,6 @@ PUBKEYS=$@
 
 TMPDIR=`mktemp --tmpdir=/dev/shm --directory`
 TMPKEY="${TMPDIR}/tmpkey"
-GNUPGHOME="${TMPDIR}"
 CRYPTHOME="/etc/cryptsetup-initramfs"
 ROOT_DEV=""
 ROOT_DEV_FULL=""
@@ -70,19 +69,18 @@ else
   echo "ERROR: scdaemon package not installed. The scdaemon package is required to access the OpenPGP smart card"
   exit 1
 fi
-  
-chmod 700 $GNUPGHOME
+
 # create cryptfs GPG home dir
-gpg2 --homedir ${GNUPGHOME} --card-status
+gpg2  --card-status
 if [ $? -ne 0 ]; then
   echo Insert your OpenPGP smart card and press Enter
   read _
-  gpg2 --homedir ${GNUPGHOME} --card-status || exit 1
+  gpg2  --card-status || exit 1
 fi
 
-gpg2 --homedir ${GNUPGHOME} --import $PUBKEYS
-gpg2 --homedir ${GNUPGHOME} --export --export-options export-minimal > ${CRYPTHOME}/pubring.gpg
-GPG_RECIPIENT=`gpg --homedir="$GNUPGHOME" --with-colons --list-keys \
+gpg2  --import $PUBKEYS
+gpg2  --export --export-options export-minimal > ${CRYPTHOME}/pubring.gpg
+GPG_RECIPIENT=`gpg --with-colons --list-keys \
     | sed -nr 's/^pub(:[^:]*){3}:([0-9a-fA-F]+)(:[^:]*){6}:[^:]*[eE].*/-r \2/p'`
 
 if [ "$GPG_RECIPIENT" = "" ]; then
@@ -96,24 +94,24 @@ if [ -e "${CRYPTHOME}/cryptkey.gpg" ]; then
 else
 # generate secret key
   dd if=/dev/random bs=1 count=256 >${TMPKEY}
-  gpg2 --homedir ${GNUPGHOME} --trust-model=always -o ${CRYPTHOME}/cryptkey.gpg $GPG_RECIPIENT --yes --encrypt ${TMPKEY}
+  gpg2  --trust-model=always -o ${CRYPTHOME}/cryptkey.gpg $GPG_RECIPIENT --yes --encrypt ${TMPKEY}
   if [ $? -ne 0 ]; then
     echo "Encryption of ${CRYPTHOME}/cryptkey.gpg failed! Aborting!"
     shred -u ${TMPKEY}
     shred -u ${CRYPTHOME}/cryptkey.gpg
     exit 1
   fi
-  
+
   # test decryption
-  GNUPGHOME=$GNUPGHOME /lib/cryptsetup/scripts/decrypt_gnupg-sc ${CRYPTHOME}/cryptkey.gpg > /dev/null
-  
+  /lib/cryptsetup/scripts/decrypt_gnupg-sc ${CRYPTHOME}/cryptkey.gpg > /dev/null
+
   if [ $? -ne 0 ]; then
     echo "Decryption test for ${CRYPTHOME}/cryptkey.gpg failed! Aborting!"
     shred -u ${TMPKEY}
     shred -u ${CRYPTHOME}/cryptkey.gpg
     exit 1
   fi
-  
+
   echo -e "\n\nAdding your new secret key to LUKS.\nWhen prompted, type in your OLD passphrase to unlock the disk."
   cryptsetup luksAddKey $ROOT_DEV_FULL ${TMPKEY}
   if [ $? -ne 0 ]; then
